@@ -1,6 +1,8 @@
 #include <types.h>
 #include <gdt.h>
 #include <port.h>
+#include <interrupts.h>
+#include <keyboard.h>
 
 using namespace os;
 
@@ -100,10 +102,13 @@ extern "C" void callConstructors() {
 }
 
 extern "C" void kernelMain(const void* multiboot_structure, uint32_t magicnumber) {
-    printf("\v");
-    printf("   (\\(\\\n   (-.-)\n  o_(\")(\")");
+    printf("\v"); // clear screen
+    printf("   (\\(\\\n   (-.-)\n  o_(\")(\")"); // bunny
 
     GlobalDescriptorTable* gdt;
+    InterruptManager interrupts(0x20, gdt);
+    KeyboardDriver keyboard(&interrupts);
+    interrupts.Activate();
 
     while(1);
 }
