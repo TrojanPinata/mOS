@@ -18,6 +18,7 @@ _ZN2os16InterruptManager16HandleException\num\()Ev:
 .global _ZN2os16InterruptManager26HandleInterruptRequest\num\()Ev
 _ZN2os16InterruptManager26HandleInterruptRequest\num\()Ev:
 	movb $\num + IRQ_BASE, (interruptnumber)
+    pushl $0
 	jmp int_bottom
 .endm
 
@@ -64,12 +65,22 @@ HandleInterruptRequest 0x80
 
 int_bottom:
     # save registers
-    pusha
-    pushl %ds
-    pushl %es
-    pushl %fs
-    pushl %gs
+    #pusha
+    #pushl %ds
+    #pushl %es
+    #pushl %fs
+    #pushl %gs
 
+    pushl %ebp
+    pushl %edi
+    pushl %esi
+
+    pushl %edx
+    pushl %ecx
+    pushl %ebx
+    pushl %eax
+
+    # load ring 0 segment register
     #cld
     #mov $0x10, %eax
     #mov %eax, %eds
@@ -79,15 +90,25 @@ int_bottom:
     pushl %esp
     push (interruptnumber)
     call _ZN2os16InterruptManager15HandleInterruptEhj
-    add %esp, 6
-    mov %eax, %esp # switch stack
+    #add %esp, 6
+    mov %eax, %esp # switch the stack
 
-    # load registers
-    pop %gs
-    pop %fs
-    pop %es
-    pop %ds
-    popa
+    # restore registers
+    popl %eax
+    popl %ebx
+    popl %ecx
+    popl %edx
+
+    popl %esi
+    popl %edi
+    popl %ebp
+    #pop %gs
+    #pop %fs
+    #pop %es
+    #pop %ds
+    #popa
+
+    add $4, %esp
 
 _ZN2os16InterruptManager22IgnoreInterruptRequestEv:
 	iret

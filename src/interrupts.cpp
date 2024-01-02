@@ -37,16 +37,17 @@ void InterruptManager::SetInterruptDescriptorTableEntry(uint8_t interrupt,
 }
 
 
-InterruptManager::InterruptManager(uint16_t hardwareInterruptOffset, GlobalDescriptorTable* globalDescriptorTable)
+InterruptManager::InterruptManager(uint16_t hardwareInterruptOffset, GlobalDescriptorTable* globalDescriptorTable, TaskManager* taskManager)
     : programmableInterruptControllerMasterCommandPort(0x20),
       programmableInterruptControllerMasterDataPort(0x21),
       programmableInterruptControllerSlaveCommandPort(0xA0),
       programmableInterruptControllerSlaveDataPort(0xA1) {
+    this->taskManager = taskManager;
     this->hardwareInterruptOffset = hardwareInterruptOffset;
     uint32_t CodeSegment = globalDescriptorTable->CodeSegmentSelector();
 
     const uint8_t IDT_INTERRUPT_GATE = 0xE;
-    for(uint8_t i = 255; i > 0; --i) {
+    for (uint8_t i = 255; i > 0; --i) {
         SetInterruptDescriptorTableEntry(i, CodeSegment, &IgnoreInterruptRequest, 0, IDT_INTERRUPT_GATE);
         handlers[i] = 0;
     }
@@ -149,9 +150,14 @@ uint32_t InterruptManager::DoHandleInterrupt(uint8_t interrupt, uint32_t esp) {
     if(handlers[interrupt] != 0) {
         esp = handlers[interrupt]->HandleInterrupt(esp);
     }
-    else if(interrupt != hardwareInterruptOffset) {
+    // qemu why are you like this?
+    else if (interrupt != hardwareInterruptOffset && interrupt != 0x2e) {
         printf("UNHANDLED INTERRUPT 0x");
         printfHex(interrupt);
+    }
+
+    if (interrupt == hardwareInterruptOffset) {
+        esp = (uint32_t)taskManager->Schedule((CPUState*)esp);
     }
 
     // hardware interrupts must be acknowledged

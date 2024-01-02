@@ -5,8 +5,16 @@
 #include <interrupts.h>
 #include <keyboard.h>
 #include <mouse.h>
+//#include <pci.h>
+#include <vga.h>
+#include <graphics/desktop.h>
+#include <graphics/window.h>
+#include <multitasking.h>
+
+// #define GRAPHICSMODE
 
 using namespace os;
+using namespace os::graphics;
 
 void printf(char* str) {
 	static uint8_t x = 0, y = 0;
@@ -92,8 +100,7 @@ void printf(char* str) {
 	}
 }
 
-void printfHex(uint8_t key)
-{
+void printfHex(uint8_t key) {
     char* foo = "00";
     char* hex = "0123456789ABCDEF";
     foo[0] = hex[(key >> 4) & 0xF];
@@ -144,13 +151,24 @@ class MouseToConsole : public MouseEventHandler {
     }
 };
 
+// multitasking test
+void taskA() {
+    while(true)
+        printf("A");
+}
+
+void taskB() {
+    while(true)
+        printf("B");
+}
+
 
 
 typedef void (*constructor)();
 extern "C" constructor start_ctors;
 extern "C" constructor end_ctors;
 extern "C" void callConstructors() {
-    for(constructor* i = &start_ctors; i != &end_ctors; i++) {
+    for (constructor* i = &start_ctors; i != &end_ctors; i++) {
         (*i)();
     }
 }
@@ -160,28 +178,69 @@ extern "C" void kernelMain(const void* multiboot_structure, uint32_t magicnumber
     printf("   (\\(\\\n   (-.-)\n  o_(\")(\")\n"); // bunny
 
     GlobalDescriptorTable* gdt;
-    InterruptManager interrupts(0x20, gdt);
+    TaskManager* taskManager;
+    //Task task1(&gdt, taskA);
+    //Task task2(&gdt, taskB);
+    //taskManager.AddTask(&task1);
+    //taskManager.AddTask(&task2);
+    InterruptManager interrupts(0x20, gdt, taskManager);
     
 	printf("Initializing Hardware, Stage 1\n");
+	#ifdef GRAPHICSMODE
+        Desktop desktop(320,200, 0x00,0x00,0xA8);
+    #endif
 
     DriverManager drvManager;
 
+	printf("   initializing keyboard\n");
+	#ifdef GRAPHICSMODE
+        KeyboardDriver keyboard(&interrupts, &desktop);
+    #else
         PrintfKeyboardEventHandler kbhandler;
         KeyboardDriver keyboard(&interrupts, &kbhandler);
-        drvManager.AddDriver(&keyboard);
+    #endif
+    drvManager.AddDriver(&keyboard);
 
+	printf("   initializing mouse\n");
+	#ifdef GRAPHICSMODE
+        MouseDriver mouse(&interrupts, &desktop);
+    #else
         MouseToConsole mousehandler;
         MouseDriver mouse(&interrupts, &mousehandler);
-        drvManager.AddDriver(&mouse);
+    #endif
+    drvManager.AddDriver(&mouse);
 
+	//printf("   initializing pci\n");
+	//PeripheralComponentInterconnectController PCIController;
+    //PCIController.SelectDrivers(&drvManager, &interrupts);
+
+	printf("   initializing vga\n");
+	VideoGraphicsArray vga;
 
     printf("Initializing Hardware, Stage 2\n");
         drvManager.ActivateAll();
 
     printf("Initializing Hardware, Stage 3\n");
-
+    #ifdef GRAPHICSMODE
+        vga.SetMode(320,200,8);
+        Window win1(&desktop, 10,10,20,20, 0xA8,0x00,0x00);
+        desktop.AddChild(&win1);
+        Window win2(&desktop, 40,15,30,30, 0x00,0xA8,0x00);
+        desktop.AddChild(&win2);
+    #endif
+	printf("Activating Interrupts\n");
     interrupts.Activate();
 
-    while(1);
+	printf("Everything works (maybe)\n");
+
+	printf("Activating VGA\n");
+    vga.SetMode(320,200,8);
+    while(1) {
+		vga.FillRectangle(0,0,320,200,0x00,0x00,0xA8);
+		#ifdef GRAPHICSMODE
+			desktop.Draw(&vga);
+		#endif
+		while(1);
+    }
 }
 

@@ -8,8 +8,13 @@ objects = obj/loader.o \
 	obj/port.o \
 	obj/interruptstubs.o \
 	obj/interrupts.o \
+	obj/multitasking.o \
 	obj/keyboard.o \
 	obj/mouse.o \
+	obj/vga.o \
+	obj/graphics/widget.o \
+	obj/graphics/window.o \
+	obj/graphics/desktop.o \
 	obj/kernel.o
 
 obj/%.o: src/%.cpp
